@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pydantic-ai-ejentum"
-version = "0.1.0"
-description = "PydanticAI toolset for the Ejentum Reasoning Harness. EjentumToolset subclasses pydantic_ai.FunctionToolset and registers four tools (harness_reasoning, harness_code, harness_anti_deception, harness_memory) the agent calls before generating. Each call returns a task-matched cognitive operation engineered in two layers: a natural-language procedure plus an executable reasoning topology (graph DAG with gates, parallel branches, and meta-cognitive exits)."
+version = "0.2.0"
+description = "PydanticAI toolset for the Ejentum Reasoning Harness. EjentumToolset subclasses pydantic_ai.FunctionToolset and registers eight tools: four dynamic (reasoning, code, anti-deception, memory) plus four adaptive variants (adaptive-reasoning, adaptive-code, adaptive-anti-deception, adaptive-memory) that pre-fit the cognitive operation to the caller's task via an adapter LLM. Each call returns a task-matched cognitive operation engineered in two layers: a natural-language procedure plus an executable reasoning topology (graph DAG with gates, parallel branches, and meta-cognitive exits)."
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = "MIT"
