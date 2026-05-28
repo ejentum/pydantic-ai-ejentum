@@ -1,15 +1,12 @@
 # pydantic-ai-ejentum
 
-A [PydanticAI](https://ai.pydantic.dev) toolset for the [Ejentum](https://ejentum.com) Reasoning Harness. `EjentumToolset` subclasses `pydantic_ai.FunctionToolset` and registers eight agent-callable tools the agent picks between before generating: four dynamic (`reasoning`, `code`, `anti-deception`, `memory`) plus four adaptive (`adaptive-reasoning`, `adaptive-code`, `adaptive-anti-deception`, `adaptive-memory`) that pre-fit the cognitive operation to the caller's task via an adapter LLM.
+[PydanticAI](https://ai.pydantic.dev) toolset for the Ejentum Reasoning Harness. `EjentumToolset` subclasses `pydantic_ai.FunctionToolset` and registers eight agent-callable tools.
 
-Each operation in the Ejentum library (679 of them, organized across four cognitive harnesses each with dynamic and adaptive variants) is engineered in **two layers**:
+Four dynamic tools (`reasoning`, `code`, `anti-deception`, `memory`) are available on all tiers including the 30-day free trial. Four adaptive tools (`adaptive-reasoning`, `adaptive-code`, `adaptive-anti-deception`, `adaptive-memory`) additionally run an adapter LLM that rewrites the matched operation with task-specific identifiers; they require the Go or Super tier.
 
-- a **natural-language procedure** the model can read, naming the steps to take and the failure pattern to refuse, and
-- an **executable reasoning topology**: a graph-shaped plan over those steps. The plan names explicit decision points where the model branches, parallel branches that run and rejoin, bounded loops that run until convergence, named meta-cognitive moments where the model is asked to stop, look at its own working, and re-enter at a specific step, plus escape paths for when the prescribed plan stops fitting the task at hand.
+PydanticAI accepts hyphenated tool names via `@tool_plain(name="anti-deception")`. The Python method symbols use underscores (`anti_deception`), but the LLM-facing names registered with the agent use the canonical hyphenated form.
 
-The natural-language layer tells the model *what* to do. The topology layer pins down *how* those steps connect: where to decide, where to loop, where to stop and look at itself. Together they act as a persistent attention anchor that survives long context windows and multi-turn execution chains, which is precisely where a model's own reasoning template typically decays.
-
-## Installation
+## Install
 
 ```bash
 pip install pydantic-ai-ejentum
@@ -17,11 +14,11 @@ pip install pydantic-ai-ejentum
 
 ## Configuration
 
-Get an Ejentum API key at <https://ejentum.com/pricing>. The 30-day free trial (no card required) includes 1,000 dynamic reasoning calls; adaptive tools require Go or Super.
-
 ```bash
 export EJENTUM_API_KEY="ej_..."
 ```
+
+Or pass `api_key=` to `EjentumToolset(...)`. Get a key at [ejentum.com/pricing](https://ejentum.com/pricing).
 
 ## Usage
 
@@ -31,17 +28,17 @@ from pydantic_ai_ejentum import EjentumToolset
 
 agent = Agent(
     "anthropic:claude-sonnet-4-6",
-    toolsets=[EjentumToolset()],  # reads EJENTUM_API_KEY from env
+    toolsets=[EjentumToolset()],
 )
 
 result = agent.run_sync(
-    "We've spent three months on the GraphQL gateway. It's mostly done. "
+    "We have spent three months on the GraphQL gateway. It's mostly done. "
     "Should we keep going or pivot to REST?"
 )
 print(result.output)
 ```
 
-The toolset ships with PydanticAI `instructions` that nudge the agent to call the matching harness tool before generating. Pass `add_instructions=False` to suppress and supply your own routing guidance.
+`EjentumToolset` ships with `FunctionToolset.instructions` that nudge the agent to call the matching tool before generating. Pass `add_instructions=False` to suppress and supply routing guidance in your own system prompt.
 
 ### Explicit API key
 
@@ -52,67 +49,35 @@ toolset = EjentumToolset(api_key="ej_...")
 ### Composing with other toolsets
 
 ```python
-from pydantic_ai import Agent
-from pydantic_ai_ejentum import EjentumToolset
-from my_other_package import my_toolset
-
 agent = Agent(
     "anthropic:claude-sonnet-4-6",
-    toolsets=[EjentumToolset(), my_toolset],
+    toolsets=[EjentumToolset(), my_other_toolset],
 )
 ```
 
-## The eight tools
+## Tool inventory
 
-### Dynamic (single retrieval, all tiers including the 30-day free trial)
+### Dynamic (all tiers)
 
-| Tool name (LLM-visible) | Best for | Library size |
-|---|---|---|
-| `reasoning` | Analytical, diagnostic, planning, multi-step tasks spanning abstraction, time, causality, simulation, spatial, and metacognition | 311 operations |
-| `code` | Code generation, refactoring, review, and debugging across the software-engineering layer | 128 operations |
-| `anti-deception` | Prompts that pressure the agent to validate, certify, or soften an honest assessment | 139 operations |
-| `memory` | Sharpening an observation already formed about cross-turn drift. Filter-oriented, not write-oriented. Format `query` as `"I noticed X. This might mean Y. Sharpen: Z."` | 101 operations |
+| Tool name (LLM-visible) | Mode string | Library size |
+|---|---|---:|
+| `reasoning` | `reasoning` | 311 |
+| `code` | `code` | 128 |
+| `anti-deception` | `anti-deception` | 139 |
+| `memory` | `memory` | 101 |
 
-### Adaptive (top-k retrieval + adapter LLM rewrites operation to fit the task; Go or Super tier required)
+### Adaptive (Go or Super tier)
 
-| Tool name | When to prefer over the dynamic version |
+| Tool name | Mode string |
 |---|---|
-| `adaptive-reasoning` | High-stakes analytical work where every DAG node should be mapped to your specifics before generation. |
-| `adaptive-code` | Security-critical reviews, refactor-heavy diffs, or any code work where every verification step should be concretized. |
-| `adaptive-anti-deception` | When the stakes of a soft or sycophantic answer are high. |
-| `adaptive-memory` | When the dynamic memory tool's general scaffold is not sharp enough for the perception being formed. |
+| `adaptive-reasoning` | `adaptive-reasoning` |
+| `adaptive-code` | `adaptive-code` |
+| `adaptive-anti-deception` | `adaptive-anti-deception` |
+| `adaptive-memory` | `adaptive-memory` |
 
-> **Hyphenated tool names.** PydanticAI accepts hyphenated tool names via `@tool_plain(name=...)`. The Python method symbols use underscores (`adaptive_anti_deception`), but the registered LLM-facing names use canonical hyphens (`adaptive-anti-deception`).
+Each tool accepts a single `query: str` argument. Returns the injection as a string. For `memory` and `adaptive-memory`, format the query as `"I noticed X. This might mean Y. Sharpen: Z."`.
 
-## What an injection looks like
-
-A real `reasoning` mode response on the query `investigate why our nightly ETL job has started failing intermittently over the past two weeks; nothing in the code or schema has changed`:
-
-```
-[NEGATIVE GATE]
-The server's response time was accepted as average, despite a suspicious
-rhythm break in its timing pattern.
-
-[PROCEDURE]
-Step 1: Establish baseline timing profiles by extracting historical
-durations and intervals for each event type. Step 2: Compare each observed
-timing against its baseline and compute deviation magnitude. ...
-
-[REASONING TOPOLOGY]
-S1:durations -> FIXED_POINT[baselines] -> N{dismiss_timing_deviations_
-without_investigation} -> for_each: S2:compare -> S3:deviation ->
-G1{>2sigma?} --yes-> S4:classify -> S5:probe_cause -> FLAG -> continue --no->
-S6:validate -> continue -> all_checked -> OUT:anomaly_report
-
-[FALSIFICATION TEST]
-If no event timing is flagged as suspiciously fast or slow relative to
-baseline, temporal anomaly detection was not active.
-
-Amplify: timing baseline comparison; anomaly classification
-Suppress: average timing acceptance; outlier normalization
-```
-
-The agent reads both the natural-language `[PROCEDURE]` and the graph-logic `[REASONING TOPOLOGY]` before generating its user-facing answer.
+Errors return as strings; tools do not raise.
 
 ## API reference
 
@@ -127,14 +92,26 @@ EjentumToolset(
 
 | Field | Default | Description |
 |---|---|---|
-| `api_key` | `None` | If omitted, read from `EJENTUM_API_KEY` at call time. |
-| `api_url` | `https://api.ejentum.com/harness/` | Override only if you self-host the Ejentum API gateway. |
-| `timeout_seconds` | `10.0` | Per-call HTTP timeout shared across all tools. |
-| `add_instructions` | `True` | When True, the toolset emits `FunctionToolset.instructions` that nudge the agent to call the matching harness before generating. Set False to provide routing guidance in your own system prompt. |
+| `api_key` | `None` | If unset, read from `EJENTUM_API_KEY` at call time. |
+| `api_url` | `https://api.ejentum.com/harness/` | Override for self-hosted gateway. |
+| `timeout_seconds` | `10.0` | Per-call HTTP timeout. |
+| `add_instructions` | `True` | Emit `FunctionToolset.instructions` nudging the agent to call the matching tool before generating. |
 
-Each of the eight tools accepts a single `query: str` argument (1-2 sentences) and returns the injection as a string. Errors are returned as human-readable strings (no exceptions cross the tool boundary, so an agent step never crashes the run).
+## Wire contract
 
-> **MCP alternative.** This package wraps the Ejentum API REST gateway. If you prefer the MCP route (to share one server across frameworks), the same eight harness tools are hosted at `https://api.ejentum.com/mcp` with Bearer auth. PydanticAI's MCP support can consume the hosted endpoint directly.
+```
+POST https://api.ejentum.com/harness/
+Headers: Authorization: Bearer <key>, Content-Type: application/json
+Body:    { "query": <string>, "mode": <one of 8 mode strings> }
+Response (200): [ { "<mode>": "<injection string>" } ]
+Response (401|403|429): { "error": "..." }
+```
+
+Full wire contract, field structure of an injection, DAG syntax, and a canonical dynamic-vs-adaptive comparison on the same query are documented in the [ejentum-mcp README](https://github.com/ejentum/ejentum-mcp#wire-contract).
+
+## ejentum-mcp alternative
+
+The same eight tools are hosted as an MCP server at `https://api.ejentum.com/mcp`. PydanticAI's MCP support can consume the endpoint directly.
 
 ## Compatibility
 
@@ -142,15 +119,6 @@ Each of the eight tools accepts a single `query: str` argument (1-2 sentences) a
 - `pydantic-ai>=0.0.20`
 - `requests>=2.31.0`
 - `pydantic>=2.0.0`
-
-## Resources
-
-- Ejentum homepage: <https://ejentum.com>
-- Pricing: <https://ejentum.com/pricing>
-- API reference: <https://ejentum.com/docs/api_reference>
-- "Why LLM Agents Fail" essay: <https://ejentum.com/blog/why-llm-agents-fail>
-- "Under Pressure" research paper: <https://doi.org/10.5281/zenodo.19392715>
-- PydanticAI documentation: <https://ai.pydantic.dev>
 
 ## License
 
