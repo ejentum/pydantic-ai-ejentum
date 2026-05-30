@@ -28,7 +28,7 @@ def test_ejentum_toolset_is_function_toolset_subclass():
     assert issubclass(EjentumToolset, FunctionToolset)
 
 
-def test_toolset_registers_four_tools():
+def test_toolset_registers_eight_tools():
     toolset = EjentumToolset(api_key="test-key")
     tool_names = set(toolset.tools.keys()) if hasattr(toolset, "tools") else None
     if tool_names is None:
@@ -37,10 +37,16 @@ def test_toolset_registers_four_tools():
             t.name if hasattr(t, "name") else getattr(t, "_name", str(t))
             for t in toolset._tools.values()  # type: ignore[attr-defined]
         }
-    assert "harness_reasoning" in tool_names
-    assert "harness_code" in tool_names
-    assert "harness_anti_deception" in tool_names
-    assert "harness_memory" in tool_names
+    # Dynamic tools (all tiers)
+    assert "reasoning" in tool_names
+    assert "code" in tool_names
+    assert "anti-deception" in tool_names
+    assert "memory" in tool_names
+    # Adaptive tools (Go/Super tier)
+    assert "adaptive-reasoning" in tool_names
+    assert "adaptive-code" in tool_names
+    assert "adaptive-anti-deception" in tool_names
+    assert "adaptive-memory" in tool_names
 
 
 def test_toolset_has_instructions_by_default():
@@ -144,7 +150,16 @@ def test_call_logic_api_missing_api_key_returns_actionable_error(monkeypatch):
 
 @pytest.mark.parametrize(
     "mode",
-    ["reasoning", "code", "anti-deception", "memory"],
+    [
+        "reasoning",
+        "code",
+        "anti-deception",
+        "memory",
+        "adaptive-reasoning",
+        "adaptive-code",
+        "adaptive-anti-deception",
+        "adaptive-memory",
+    ],
 )
 @patch("pydantic_ai_ejentum._api.requests.post")
 def test_call_logic_api_each_mode_round_trips(mock_post, mode):
